@@ -1,8 +1,6 @@
 #include "ServiceHandler.h"
 
 std::string ServiceHandler::openAiResponse(const std::string& prompt, const std::string& systemPrompt) {
-    std::cout << "HERE\n";
-    
     std::string url = "https://api.openai.com/v1/chat/completions";
 
 	conversation_history.push_back({ "user",prompt });
