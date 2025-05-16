@@ -26,11 +26,11 @@ add_executable(AIBot
 target_include_directories(AIBot PRIVATE 
     /mingw64/include    
     include
+    include/leopard
     external/dpp/include
-    external/leopard/include
 )
 
-target_link_libraries(AIBot PRIVATE ${CMAKE_SOURCE_DIR}/external/leopard/lib/libpv_leopard.lib)
+target_link_libraries(AIBot PRIVATE ${CMAKE_SOURCE_DIR}/external/leopard/libpv_leopard.lib)
 
 find_package(CURL REQUIRED)
 target_link_libraries(AIBot PRIVATE CURL::libcurl)
@@ -52,11 +52,11 @@ add_custom_command(TARGET AIBot POST_BUILD
         $<TARGET_FILE_DIR:AIBot>
 
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_SOURCE_DIR}/include/leopard/languageModel.pv
+        ${CMAKE_SOURCE_DIR}/external/leopard/languageModel.pv
         $<TARGET_FILE_DIR:AIBot>
 
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_SOURCE_DIR}/include/leopard/libpv_leopard.dll
+        ${CMAKE_SOURCE_DIR}/external/leopard/libpv_leopard.dll
         $<TARGET_FILE_DIR:AIBot>
 
     #COMMAND ${CMAKE_COMMAND} -E copy_if_different /mingw64/bin/libcrypto-3-x64.dll $<TARGET_FILE_DIR:AIBot>
