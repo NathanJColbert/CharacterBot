@@ -21,46 +21,23 @@ void CharacterBot::run() {
 
 
 	on_voice_receive([this](const dpp::voice_receive_t& data) {
+		// Check sum?
 		if (data.audio_data.size() == 3840) {
-			AudioReceiver* receiver = nullptr;
-			if (tryGetAudioReceiver(receiver, data.voice_client->server_id, data.user_id)) {
-				receiver->onVoiceReceive(data);
-			}
+			std::shared_ptr<GuildInformation> guildObj = NULL;
+			if (tryGetGuildInformation(guildObj, data.voice_client->server_id))
+				guildObj->sendVoiceData(data);
 		}
 		});
 
 	on_voice_state_update([this](const dpp::voice_state_update_t& event) {
-		handle_voice_state_update(event);
+		handleVoiceStateUpdate(event);
 		});
-    
-    on_voice_ready([](const dpp::voice_ready_t& event) {
-        std::cout << "[DPP] Bot connected to voice in channel " << event.voice_channel_id << std::endl;
-        });
-    
-    on_log([](const dpp::log_t& log) {
-        std::cout << "[LOG " << log.severity << "] " << log.message << std::endl;
-        });
 
-	start(dpp::st_return);
+	start(dpp::st_wait);
+	/*
 	while (true) {
 		std::this_thread::sleep_for(std::chrono::milliseconds(400));
-		updateTimeout();
-	}
-}
-
-void CharacterBot::updateTimeout() {
-	std::vector<int16_t> buffer;
-	for (auto guild = guilds.begin(); guild != guilds.end(); guild++) {
-		for (auto user = guild->second->usersReceivers->begin(); user != guild->second->usersReceivers->end(); user++) {
-			if (user->second->checkTimeout(buffer)) {
-				if (buffer.size() <= 0) continue;
-				auto& guildObject = guild->second;
-				auto userSnowflake = user->first;
-				processNewSpeechToText(&buffer, guild->second, guild->first, user->first);
-				break;
-			}
-		}
-	}
+	}*/
 }
 
 bool CharacterBot::stringExists(const std::string& origin, const std::string& check) {
@@ -80,6 +57,7 @@ bool CharacterBot::tryResponse(const std::string& stt) {
 }
 
 void CharacterBot::processNewSpeechToText(std::vector<int16_t>* buffer, GuildInformation* guildObject, const dpp::snowflake& guild, const dpp::snowflake& user) {
+	/*
 	std::string stt = guildObject->speechToText->getResponse(buffer, user);
 	std::cout << stt << std::endl;
 	return;
@@ -96,85 +74,60 @@ void CharacterBot::processNewSpeechToText(std::vector<int16_t>* buffer, GuildInf
 	for (auto i = guildObject->usersReceivers->begin(); i != guildObject->usersReceivers->end(); i++) {
 		i->second->resetBuffer();
 	}
-	std::cout << "Purged audio recievers for guild..." << std::endl;
+	std::cout << "Purged audio recievers for guild..." << std::endl;*/
 }
 
-bool CharacterBot::tryGetAudioReceiver(AudioReceiver*& receiver, const dpp::snowflake& guild, const dpp::snowflake& user) {
-	auto guildIterator = guilds.find(guild);
-
-	if (guildIterator == guilds.end()) {
-		std::cout << "Extra data read from a non-source " << user << " ignoring..." << std::endl;
+bool CharacterBot::tryGetGuildInformation(std::shared_ptr<GuildInformation>& guildInformation, const dpp::snowflake& guild) {
+	auto it = guilds.find(guild);
+	if (it == guilds.end())
 		return false;
-	}
-	std::unordered_map<dpp::snowflake, AudioReceiver*>* guildMap = guildIterator->second->usersReceivers;
-	auto userIterator = guildMap->find(user);
-	if (userIterator == guildMap->end()) {
-		std::cout << "User could not be found in guild when trying to load source " << guild << " ignoring..." << std::endl;
-		return false;
-	}
-	receiver = userIterator->second;
+	guildInformation = it->second;
 	return true;
 }
 
 bool CharacterBot::addUserInVoice(const dpp::snowflake& guild, const dpp::snowflake& user) {
-	auto guildIterator = guilds.find(guild);
-	if (guildIterator == guilds.end()) {
+	std::shared_ptr<GuildInformation> guildObj = NULL;
+	if (!tryGetGuildInformation(guildObj, guild)) {
 		std::cout << "Having issues finding a guild for the client." << std::endl;
 		return false;
 	}
-
-	std::unordered_map<dpp::snowflake, AudioReceiver*>* guildMap = guildIterator->second->usersReceivers;
-	auto userIterator = guildMap->find(user);
-	if (userIterator != guildMap->end()) {
+	if (!guildObj->addUser(user)) {
 		std::cout << "The user is already in the snowflake map! Skipping..." << std::endl;
 		return false;
 	}
-	guildMap->insert(std::pair(user, new AudioReceiver(user)));
-	std::cout << "Added User " << user << std::endl;
 	return true;
 }
 
 bool CharacterBot::removeUserInVoice(dpp::discord_client* shard, const dpp::snowflake& guild, const dpp::snowflake& user) {
-	auto guildIterator = guilds.find(guild);
-
-	if (guildIterator == guilds.end()) {
-		std::cout << "Guild could not be found for user " << user << " ignoring..." << std::endl;
+	std::shared_ptr<GuildInformation> guildObj = NULL;
+	if (!tryGetGuildInformation(guildObj, guild)) {
+		std::cout << "Having issues finding a guild for a user disconnect. This indicates a memory leak." << std::endl;
 		return false;
 	}
 
-	std::unordered_map<dpp::snowflake, AudioReceiver*>* receiverMap = guildIterator->second->usersReceivers;
-	auto userIterator = receiverMap->find(user);
-	if (userIterator != receiverMap->end()) {
-		delete userIterator->second;
-		receiverMap->erase(userIterator);
-		std::cout << "Removed User " << user << std::endl;
-
-		if (receiverMap->size() <= 1) {
-			shard->disconnect_voice(guild);
-			removeBotInGuildVoice(guild);
-		}
-		return true;
+	if (!guildObj->removeUser(user)) {
+		std::cout << "User: " << user << " could not be found in guild " << guild << ".\n";
+		return false;
 	}
-	return false;
+	std::cout << "Removed User " << user << std::endl;
+	if (guildObj->userCount() <= 1) {
+		shard->disconnect_voice(guild);
+		removeBotInGuildVoice(guild);
+	}
+	return true;
 }
 
 bool CharacterBot::removeBotInGuildVoice(const dpp::snowflake& guild) {
 	auto guildIterator = guilds.find(guild);
-
 	if (guildIterator == guilds.end()) {
-		std::cout << "Guild could not be found for guild " << guild << " ignoring..." << std::endl;
+		std::cout << "Guild could not be found " << guild << " ignoring..." << std::endl;
 		return false;
 	}
-	std::unordered_map<dpp::snowflake, AudioReceiver*>* receiverMap = guildIterator->second->usersReceivers;
-	for (auto user = receiverMap->begin(); user != receiverMap->end(); user++) {
-		delete user->second;
-	}
-	delete guildIterator->second;
 	guilds.erase(guildIterator);
 	return true;
 }
 
-void CharacterBot::handle_voice_state_update(const dpp::voice_state_update_t& event) {
+void CharacterBot::handleVoiceStateUpdate(const dpp::voice_state_update_t& event) {
 	if (!activeInGuild(event.state.guild_id)) return;
 	if (event.state.channel_id != dpp::snowflake()) {
 		std::cout << "User " << event.state.user_id << " joined voice channel." << std::endl;
@@ -188,32 +141,27 @@ void CharacterBot::handle_voice_state_update(const dpp::voice_state_update_t& ev
 
 void CharacterBot::joinVoice(const dpp::slashcommand_t& event) {
 	dpp::guild* guild = dpp::find_guild(event.command.guild_id);
-
     if (!guild) {
         event.reply("Guild not found!");
         return;
     }
-
 	auto guildIterator = guilds.find(event.command.guild_id);
 	if (guildIterator != guilds.end()) {
 		std::cout << "Having issues when joining a guild... This indicates a memory leak" << std::endl;
 		return;
 	}
-
     if (!guild->connect_member_voice(*event.owner, event.command.get_issuing_user().id)) {
         event.reply("You don't seem to be in a voice channel!");
         return;
     }
-
 	event.reply("Joined your channel!");
 
-	std::unordered_map<dpp::snowflake, AudioReceiver*>* audioMap = new std::unordered_map<dpp::snowflake, AudioReceiver*>();
-	audioMap->reserve(20);
-	dpp::voiceconn* connection = event.from()->get_voice(event.command.guild_id);
-	SpeechToText* stt = new SpeechToText(event.command.guild_id, LEOPARD);
-	GuildInformation* newGuild = new GuildInformation(audioMap, stt, connection);
-	guilds.insert(std::pair(event.command.guild_id, newGuild));
+	dpp::snowflake guildId = event.command.guild_id;
+	dpp::voiceconn* connection = event.from()->get_voice(guildId);
+	auto newGuild = std::make_shared<GuildInformation>(guildId, connection, OPEN_AI, LEOPARD);
+	guilds.insert(std::pair(guildId, newGuild));
 
+	// Update all users already in the channel
 	dpp::voicestate voice_state = (guild->voice_members).find(event.command.get_issuing_user().id)->second;
 	for (const auto& voice_state_entry : guild->voice_members) {
 		// Check if the user is in the same voice channel as the issuing user
