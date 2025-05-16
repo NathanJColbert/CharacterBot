@@ -1,3 +1,11 @@
 [submodule "external/leopard"]
 	path = external/leopard
 	url = https://github.com/Picovoice/leopard.git
+[submodule "external/dpp"]
+	path = external/dpp
+	url = https://github.com/NathanJColbert/ModifiedDPP.git
+	branch = V_MINGW64
+[submodule "external/modifiedDpp"]
+	path = external/modifiedDpp
+	url = https://github.com/NathanJColbert/ModifiedDPP.git
+	branch = V_MINGW64
