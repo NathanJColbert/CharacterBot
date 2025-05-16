@@ -1,0 +1,6 @@
+[submodule "external/dpp"]
+	path = external/dpp
+	url = https://github.com/brainboxdotcc/DPP.git
+[submodule "external/leopard"]
+	path = external/leopard
+	url = https://github.com/Picovoice/leopard.git
