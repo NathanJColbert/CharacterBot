@@ -85,7 +85,6 @@ private:
 	ServiceHandler serviceHandler;
 	dpp::discord_client* connection;
 
-    //std::unordered_map<dpp::snowflake, std::vector<std::string>> userSTT;
     std::mutex accessLock;
     std::atomic<bool> running;
     std::thread workerThread;
@@ -99,7 +98,7 @@ private:
         std::cout << "Guild thread started for " << guildId << std::endl;
         while (running) {
             updateTimeout();
-            std::this_thread::sleep_for(std::chrono::milliseconds(400));
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
         }
         std::cout << "Guild thread exiting for " << guildId << std::endl;
     }
@@ -144,35 +143,29 @@ private:
     }
 
     std::vector<uint8_t> upsampleAndConvert(const std::vector<int16_t>& input) {
-        // Prepare the output buffer: 2x for upsampling (24kHz → 48kHz), 2x for stereo, 2 bytes per sample
         std::vector<uint8_t> output;
-        output.reserve(input.size() * 4 * sizeof(int16_t)); // 4x expansion (mono→stereo + upsample)
+        output.reserve(input.size() * 4 * sizeof(int16_t));
 
-        const float volume_scale = 0.8f; // Scale volume to prevent clipping/distortion
+        const float volume_scale = 0.9f;
 
         for (size_t i = 0; i < input.size() - 1; ++i) {
             int16_t a = static_cast<int16_t>(input[i] * volume_scale);
             int16_t b = static_cast<int16_t>(input[i + 1] * volume_scale);
 
-            // Original sample
             int16_t s1 = a;
-            // Interpolated sample (basic linear interpolation)
             int16_t s2 = static_cast<int16_t>((a + b) / 2);
 
-            // Stereo frame 1: s1 to Left and Right
             output.push_back(s1 & 0xFF);             // LSB
             output.push_back((s1 >> 8) & 0xFF);      // MSB
             output.push_back(s1 & 0xFF);
             output.push_back((s1 >> 8) & 0xFF);
 
-            // Stereo frame 2: s2 to Left and Right
             output.push_back(s2 & 0xFF);
             output.push_back((s2 >> 8) & 0xFF);
             output.push_back(s2 & 0xFF);
             output.push_back((s2 >> 8) & 0xFF);
         }
 
-        // Handle final sample
         int16_t last = static_cast<int16_t>(input.back() * volume_scale);
         output.push_back(last & 0xFF);
         output.push_back((last >> 8) & 0xFF);
@@ -185,12 +178,12 @@ private:
         std::cout << "- NEW PROMPT WILL BE SENT -\n";
         std::cout << userPrompt << '\n';
 
-        std::string result = serviceHandler.openAiResponse(userPrompt, "You're name is paul. You are in a discord call with your friends. You work at MCDonalds as a cashier. Respond as if you are a single character in a group do not use any name definitions.");
+        std::string result = serviceHandler.openAiResponse(userPrompt, "You're name is paul. You are in a discord call with your friends. You work at MCDonalds as a cashier. Respond as if you are a single character in a group do not use any name definitions. Keep your response short");
         std::cout << "- RESULT -\n";
         std::cout << result << '\n';
 
         std::vector<int16_t> audioResult = serviceHandler.elevenLabsTextToSpeech(result);
-        savePCMToFile(audioResult, "TMP.pcm");
+        //savePCMToFile(audioResult, "TMP.pcm");
         auto test = upsampleAndConvert(audioResult);
         streamPCMToVoiceChannel(test);
         userPrompt.clear();

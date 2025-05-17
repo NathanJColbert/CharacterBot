@@ -9,7 +9,6 @@ Making a reactive AI ChatBot in voice calls on discord. The build environment is
 - [Source Architecture](#source-architecture)
 - [Dependencies](#dependencies)
 - [Installation & Setup](#installation--setup)
-- [Usage](#usage)
 
 ## Source Architecture
 
@@ -17,7 +16,7 @@ Running on Windows 10, using MSYS2 MINGW64.
 
 ## Dependencies
 
-DPP can be covered by opus, fmt and gcc. You need git (obviously). ffmpeg is a residual library from older versions of this project. I intend to use it eventually for audio streaming.
+DPP can be covered by opus, fmt and gcc. You need git (obviously). ffmpeg is a residual library from older versions of this project. I intend to use it eventually (maybe) for audio streaming.
 
 ```bash
 pacman -Syu
