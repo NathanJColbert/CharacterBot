@@ -4,6 +4,8 @@
 #include <dpp/dpp.h>
 #include <curl/curl.h>
 
+const std::string ELEVEN_LABS_SPEECH_ID = "N2lVS1w4EtoT3dr4eOWO";
+
 static size_t writeCallback(void* contents, size_t size, size_t nmemb, std::string* output) {
 	size_t total_size = size * nmemb;
 	output->append(reinterpret_cast<char*>(contents), total_size);
@@ -30,7 +32,6 @@ public:
 private:
 	const std::string OPENAI_KEY;
 	const std::string ELEVEN_LABS_KEY;
-	const std::string ELEVEN_LABS_SPEECH_ID = "t0jbNlBVZ17f02VDIeMI";
 
 	std::deque<std::pair<std::string, std::string>> conversation_history;
 

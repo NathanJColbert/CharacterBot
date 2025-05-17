@@ -10,6 +10,7 @@
 #include "serviceHandler.h"
 
 const size_t BUFFER_SIZE_TRIGGER = 100;
+const std::string CHARACTER_PROMPT = "Your name is Palomeides. You are a great and powerful fantasy knight. You are in a discord call with your friends. Respond as if you are an individual in a group do not use any name definitions. Keep your response short";
 
 class GuildInformation {
 public:
@@ -178,7 +179,7 @@ private:
         std::cout << "- NEW PROMPT WILL BE SENT -\n";
         std::cout << userPrompt << '\n';
 
-        std::string result = serviceHandler.openAiResponse(userPrompt, "You're name is paul. You are in a discord call with your friends. You work at MCDonalds as a cashier. Respond as if you are a single character in a group do not use any name definitions. Keep your response short");
+        std::string result = serviceHandler.openAiResponse(userPrompt, CHARACTER_PROMPT);
         std::cout << "- RESULT -\n";
         std::cout << result << '\n';
 
