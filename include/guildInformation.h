@@ -1,3 +1,4 @@
+#pragma once
 #include <unordered_map>
 #include <dpp/dpp.h>
 #include <iostream>
@@ -9,13 +10,46 @@
 #include "speechToText.h"
 #include "serviceHandler.h"
 
-const size_t BUFFER_SIZE_TRIGGER = 100;
-const std::string CHARACTER_PROMPT = "Your name is Palomeides. You are a great and powerful fantasy knight. You are in a discord call with your friends. Respond as if you are an individual in a group do not use any name definitions. Keep your response short";
+struct CharacterSettings {
+    CharacterSettings(const char* characterP, long long minResponse, size_t minBuffer) :
+    characterPrompt(characterP), minResponseTime(minResponse), minBufferSize(minBuffer)
+    { }
+    std::string characterPrompt;
+	long long minResponseTime;
+	size_t minBufferSize;
+};
+
+struct ServiceInformation {
+	ServiceInformation() = default;
+	ServiceInformation(const char* openAI, const char* leopard, const char* elevenLab, const char* elevenLabId) :
+	openAIToken(openAI), leopardToken(leopard), elevenLabsToken(elevenLab), elevenLabsSpeechId(elevenLabId)
+	{ }
+	std::string openAIToken;
+	std::string leopardToken;
+	std::string elevenLabsToken;
+	std::string elevenLabsSpeechId;
+};
+
+struct BotInformation {
+	BotInformation() = default;
+	BotInformation(const ServiceInformation& serviceInfo, const CharacterSettings& characterSet, const AudioReceiverSettings& audioReceiver) :
+	serviceInformation(serviceInfo), characterSettings(characterSet), audioReceiverSettings(audioReceiver)
+	{ }
+	ServiceInformation serviceInformation;
+	CharacterSettings characterSettings;
+	AudioReceiverSettings audioReceiverSettings;
+};
 
 class GuildInformation {
 public:
-	GuildInformation(const dpp::snowflake& guild, dpp::discord_client* conn, const char* openAIKey, const char* leopardKey, const char* elevenLabsKey) :
-    guildId(guild), connection(conn), speechToText(guild, leopardKey), serviceHandler(openAIKey, elevenLabsKey), running(true) {
+	GuildInformation(const dpp::snowflake& guild, dpp::discord_client* conn, BotInformation* information) :
+    guildId(guild), connection(conn), botInformation(information), 
+    speechToText(guild, information->serviceInformation.leopardToken.c_str()), 
+    serviceHandler(
+        information->serviceInformation.openAIToken.c_str(), 
+        information->serviceInformation.elevenLabsToken.c_str(),
+        information->serviceInformation.elevenLabsSpeechId), 
+    running(true) {
 	    usersReceivers.reserve(20);
         userPrompt.reserve(1000);
         workerThread = std::thread(&GuildInformation::timeoutLoop, this);
@@ -56,7 +90,7 @@ public:
 	    if (userIterator != usersReceivers.end())
 		    return false;
 	    userNames.insert(std::pair(user, userName));
-        usersReceivers.insert(std::pair(user, new AudioReceiver(user)));
+        usersReceivers.insert(std::pair(user, new AudioReceiver(user, &(botInformation->audioReceiverSettings))));
 	    return true;
     }
     bool removeUser(const dpp::snowflake& user) {
@@ -77,8 +111,11 @@ public:
 	}
 
     size_t userCount() const { return usersReceivers.size(); }
-    
+    dpp::discord_client* getConnection() { return connection; }
+
 private:
+    BotInformation* botInformation;
+
     dpp::snowflake guildId;
     std::unordered_map<dpp::snowflake, std::string> userNames;
     std::unordered_map<dpp::snowflake, AudioReceiver*> usersReceivers;
@@ -94,6 +131,9 @@ private:
     std::atomic<bool> isVoiceThreadRunning{false};
 
     std::string userPrompt;
+
+    std::chrono::steady_clock::time_point lastResponse;
+    std::mutex lastResponseLock;
 
     void timeoutLoop() {
         std::cout << "Guild thread started for " << guildId << std::endl;
@@ -115,13 +155,28 @@ private:
 			    }
 		    }
         }
-        if (userPrompt.size() < BUFFER_SIZE_TRIGGER) return;
+        std::chrono::steady_clock::time_point snapshot;
+        {
+            std::lock_guard<std::mutex> lock(lastResponseLock);
+            snapshot = lastResponse;
+        }
+        auto now = std::chrono::steady_clock::now();
+	    auto lastResponseDuration = std::chrono::duration_cast<std::chrono::milliseconds>(now - snapshot).count();
+        if (userPrompt.size() < botInformation->characterSettings.minBufferSize) return;
+        if (lastResponseDuration < botInformation->characterSettings.minResponseTime) {
+            //std::cout << "Prevented premature response at -> " << lastResponseDuration << " milliseconds. Needed -> " << MIN_TIME_BETWEEN_RESPONSES_MILLISECONDS << " milliseconds.\n";
+            return;
+        }
         
         bool expected = false;
         if (!isVoiceThreadRunning.compare_exchange_strong(expected, true))
             return;
         voiceThread = std::thread([this] {
-            this->checkSTTBuffer();
+            {
+            std::lock_guard<std::mutex> lock(lastResponseLock);
+            lastResponse = std::chrono::steady_clock::now();
+            }
+            this->sendPrompt();
             isVoiceThreadRunning.store(false);
         });
         voiceThread.detach();
@@ -137,7 +192,7 @@ private:
         if (userName != userNames.end()) name = userName->second;
         std::string newPrompt;
         newPrompt.reserve(100);
-        newPrompt.append(name).append(": ").append(stt).append("\n");
+        newPrompt.append(name).append(", \"").append(stt).append("\"\n");
         userPrompt.append(std::move(newPrompt));
 
         std::cout << "Added new object to list.\n";
@@ -175,11 +230,11 @@ private:
 
         return output;
     }
-    void checkSTTBuffer() {
+    void sendPrompt() {
         std::cout << "- NEW PROMPT WILL BE SENT -\n";
         std::cout << userPrompt << '\n';
 
-        std::string result = serviceHandler.openAiResponse(userPrompt, CHARACTER_PROMPT);
+        std::string result = serviceHandler.openAiResponse(userPrompt, botInformation->characterSettings.characterPrompt);
         std::cout << "- RESULT -\n";
         std::cout << result << '\n';
 

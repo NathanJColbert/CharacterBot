@@ -8,7 +8,7 @@ std::string ServiceHandler::openAiResponse(const std::string& prompt, const std:
 
 	dpp::json prompt_json;
 	prompt_json["model"] = "gpt-4";
-	prompt_json["max_tokens"] = 100;
+	prompt_json["max_tokens"] = 150;
 
 	dpp::json messages = dpp::json::array();
 	messages.push_back({ {"role", "system"}, {"content", systemPrompt} });

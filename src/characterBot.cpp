@@ -2,8 +2,9 @@
 
 const bool RESET_GLOBAL_COMMANDS = false;
 
+std::atomic<bool> bot_running{true};
 void CharacterBot::run() {
-	on_log(dpp::utility::cout_logger());
+	//on_log(dpp::utility::cout_logger());
 
 	on_slashcommand([this](const dpp::slashcommand_t& event) {
 		if (event.command.get_command_name() == "join") {
@@ -44,11 +45,34 @@ void CharacterBot::run() {
 		handleVoiceStateUpdate(event);
 		});
 
-	start(dpp::st_wait);
-	/*
-	while (true) {
-		std::this_thread::sleep_for(std::chrono::milliseconds(400));
-	}*/
+	start(dpp::st_return);
+	std::cout << "Bot started successfully!" << std::endl;
+	std::thread input_thread([]() {
+		std::string input;
+		while (bot_running) {
+			std::getline(std::cin, input);
+			if (menuCompareInput(input, {"quit", "q", "exit", "e"})) {
+				std::cout << "Shutting down bot..." << std::endl;
+				bot_running = false;
+			}
+		}
+	});
+
+	while (bot_running) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	}
+
+	disconnectAll();
+	if (input_thread.joinable()) {
+		input_thread.join();
+	}
+}
+
+void CharacterBot::disconnectAll() {
+	for (auto i = guilds.begin(); i != guilds.end(); i++) {
+		auto conn = i->second->getConnection();
+		if (conn) conn->disconnect_voice(i->first);
+	}
 }
 
 bool CharacterBot::tryGetGuildInformation(std::shared_ptr<GuildInformation>& guildInformation, const dpp::snowflake& guild) {
@@ -136,7 +160,7 @@ void CharacterBot::joinVoice(const dpp::slashcommand_t& event) {
 
 	dpp::snowflake guildId = event.command.guild_id;
 	dpp::discord_client* connection = event.from();
-	auto newGuild = std::make_shared<GuildInformation>(guildId, connection, OPEN_AI, LEOPARD, ELEVEN_LABS);
+	auto newGuild = std::make_shared<GuildInformation>(guildId, connection, botInformation);
 	guilds.insert(std::pair(guildId, newGuild));
 
 	// Update all users already in the channel
@@ -157,6 +181,7 @@ void CharacterBot::leaveVoice(const dpp::slashcommand_t& event) {
     }
 	event.from()->disconnect_voice(guild->id);
 	removeBotInGuildVoice(guild->id);
+	event.reply("Left channel successfully");
 }
 
 bool CharacterBot::activeInGuild(const dpp::snowflake& guild) {

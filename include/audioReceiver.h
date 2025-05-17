@@ -2,14 +2,23 @@
 #include <dpp/dpp.h>
 #include <iostream>
 
-const size_t MIN_BUFFER_SIZE = 10000;
-const size_t MAX_BUFFER_SIZE = 3200000;
-const long long TIMEOUT_MILLISECONDS = 700;
+struct AudioReceiverSettings {
+	AudioReceiverSettings() = default;
+	AudioReceiverSettings(size_t minBuffer, size_t maxBuffer, long long timeout) :
+	minBufferSize(minBuffer), maxBufferSize(maxBuffer), timoutMilliseconds(timeout)
+	{ }
+	size_t minBufferSize;
+	size_t maxBufferSize;
+	long long timoutMilliseconds;
+};
 
 class AudioReceiver {
 public:
-	AudioReceiver(const dpp::snowflake& user) : lastReceived(std::chrono::steady_clock::now()), userId(user) {
-		pcm_buffer.reserve(MAX_BUFFER_SIZE);
+	AudioReceiver(const dpp::snowflake& user, AudioReceiverSettings* audioReceiversettings) : 
+	lastReceived(std::chrono::steady_clock::now()), 
+	userId(user),
+	settings(audioReceiversettings) {
+		pcm_buffer.reserve(settings->maxBufferSize);
 	}
 	~AudioReceiver() {
 		std::cout << "Destroyed Reciever" << std::endl;
@@ -21,6 +30,7 @@ public:
 
 private:
 	const dpp::snowflake userId;
+	AudioReceiverSettings* settings;
 	std::vector<int16_t> pcm_buffer;
 	std::chrono::steady_clock::time_point lastReceived;
 

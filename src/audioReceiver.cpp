@@ -3,10 +3,10 @@
 void AudioReceiver::onVoiceReceive(const dpp::voice_receive_t& data) {
 	if (data.audio_data.size() <= 0) return;
 
-	if (pcm_buffer.size() < MAX_BUFFER_SIZE)
+	if (pcm_buffer.size() < settings->maxBufferSize)
 		convertToLittleEndianAndResample(data.audio_data, 96000, 16000);
 
-	if (pcm_buffer.size() >= MAX_BUFFER_SIZE) {
+	if (pcm_buffer.size() >= settings->maxBufferSize) {
 		//save_audio_to_file("audio");
 		pcm_buffer.clear();
 	}
@@ -20,9 +20,9 @@ bool AudioReceiver::checkTimeout(std::vector<int16_t>& buffer) {
 	auto duration_since_last_receive = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastReceived).count();
 
 	//std::cout << duration_since_last_receive << " : " << TIMEOUT_MILLISECONDS << std::endl;
-	if (duration_since_last_receive > TIMEOUT_MILLISECONDS) {
+	if (duration_since_last_receive > settings->timoutMilliseconds) {
 		//std::cout << pcm_buffer.size() << " : " << MIN_BUFFER_SIZE << std::endl;
-		if (pcm_buffer.size() > MIN_BUFFER_SIZE) {
+		if (pcm_buffer.size() > settings->minBufferSize) {
 			buffer = std::vector<int16_t>(pcm_buffer);
 			//save_audio_to_file("audio");
 			pcm_buffer.clear();

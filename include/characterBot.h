@@ -1,20 +1,23 @@
 #pragma once
 #include <dpp/dpp.h>
+#include <thread>
+#include <atomic>
+#include <iostream>
 #include "guildInformation.h"
+#include "menuControl.h"
 
 class CharacterBot : public dpp::cluster {
 public:
-	CharacterBot(const char* token, const char* openAI, const char* leopard, const char* elevenLabs) :
-		OPEN_AI(openAI), LEOPARD(leopard), ELEVEN_LABS(elevenLabs), dpp::cluster(token) { }
+	CharacterBot(const char* token, BotInformation* information) :
+		botInformation(information), dpp::cluster(token) { }
 
 	void run();
 
 private:
-    const char* OPEN_AI;
-    const char* LEOPARD;
-    const char* ELEVEN_LABS;
+    BotInformation* botInformation;
 	std::unordered_map<dpp::snowflake, std::shared_ptr<GuildInformation>> guilds;
 
+	void disconnectAll();
 	void joinVoice(const dpp::slashcommand_t& event);
 	void leaveVoice(const dpp::slashcommand_t& event);
 	bool tryGetGuildInformation(std::shared_ptr<GuildInformation>& guildInformation, const dpp::snowflake& guild);

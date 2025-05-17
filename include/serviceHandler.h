@@ -4,8 +4,6 @@
 #include <dpp/dpp.h>
 #include <curl/curl.h>
 
-const std::string ELEVEN_LABS_SPEECH_ID = "N2lVS1w4EtoT3dr4eOWO";
-
 static size_t writeCallback(void* contents, size_t size, size_t nmemb, std::string* output) {
 	size_t total_size = size * nmemb;
 	output->append(reinterpret_cast<char*>(contents), total_size);
@@ -20,8 +18,8 @@ static size_t writeCallbackBinary(void* contents, size_t size, size_t nmemb, voi
 
 class ServiceHandler {
 public:
-	ServiceHandler(const std::string& openAiKey, const std::string& elevenLabsKey) : 
-		OPENAI_KEY(openAiKey), ELEVEN_LABS_KEY(elevenLabsKey)
+	ServiceHandler(const std::string& openAiKey, const std::string& elevenLabsKey, const std::string& elevenLabsSpeechId) : 
+		OPENAI_KEY(openAiKey), ELEVEN_LABS_KEY(elevenLabsKey), ELEVEN_LABS_SPEECH_ID(elevenLabsSpeechId)
 	{ curl_global_init(CURL_GLOBAL_DEFAULT); }
 	~ServiceHandler()
 	{ curl_global_cleanup(); }
@@ -32,6 +30,7 @@ public:
 private:
 	const std::string OPENAI_KEY;
 	const std::string ELEVEN_LABS_KEY;
+	const std::string ELEVEN_LABS_SPEECH_ID;
 
 	std::deque<std::pair<std::string, std::string>> conversation_history;
 
