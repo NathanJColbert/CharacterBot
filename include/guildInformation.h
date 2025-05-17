@@ -32,12 +32,13 @@ struct ServiceInformation {
 
 struct BotInformation {
 	BotInformation() = default;
-	BotInformation(const ServiceInformation& serviceInfo, const CharacterSettings& characterSet, const AudioReceiverSettings& audioReceiver) :
-	serviceInformation(serviceInfo), characterSettings(characterSet), audioReceiverSettings(audioReceiver)
+	BotInformation(const ServiceInformation& serviceInfo, const CharacterSettings& characterSet, const AudioReceiverSettings& audioReceiver, long long checkTime) :
+	serviceInformation(serviceInfo), characterSettings(characterSet), audioReceiverSettings(audioReceiver), checkTimeMilliseconds(checkTime)
 	{ }
 	ServiceInformation serviceInformation;
 	CharacterSettings characterSettings;
 	AudioReceiverSettings audioReceiverSettings;
+    long long checkTimeMilliseconds;
 };
 
 class GuildInformation {
@@ -139,7 +140,7 @@ private:
         std::cout << "Guild thread started for " << guildId << std::endl;
         while (running) {
             updateTimeout();
-            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            std::this_thread::sleep_for(std::chrono::milliseconds(botInformation->checkTimeMilliseconds));
         }
         std::cout << "Guild thread exiting for " << guildId << std::endl;
     }
