@@ -9,11 +9,14 @@
 #include "speechToText.h"
 #include "serviceHandler.h"
 
+const size_t BUFFER_SIZE_TRIGGER = 100;
+
 class GuildInformation {
 public:
-	GuildInformation(const dpp::snowflake& guild, dpp::voiceconn* conn, const char* openAIKey, const char* leopardKey) :
-    guildId(guild), connection(conn), speechToText(guild, leopardKey), serviceHandler(openAIKey), running(true) {
+	GuildInformation(const dpp::snowflake& guild, dpp::discord_client* conn, const char* openAIKey, const char* leopardKey, const char* elevenLabsKey) :
+    guildId(guild), connection(conn), speechToText(guild, leopardKey), serviceHandler(openAIKey, elevenLabsKey), running(true) {
 	    usersReceivers.reserve(20);
+        userPrompt.reserve(1000);
         workerThread = std::thread(&GuildInformation::timeoutLoop, this);
     }
 	
@@ -44,25 +47,31 @@ public:
 		return true;
     }
 
-    bool addUser(const dpp::snowflake& user) {
-        std::cout << "Add User: Accessing lock\n";
+    bool addUser(const dpp::snowflake& user, const std::string& userName) {
+        //std::cout << "Add User: Accessing lock\n";
         std::lock_guard<std::mutex> lock(accessLock);
-        std::cout << "Add User: Lock Accessed\n";
+        //std::cout << "Add User: Lock Accessed\n";
 	    auto userIterator = usersReceivers.find(user);
 	    if (userIterator != usersReceivers.end())
 		    return false;
-	    usersReceivers.insert(std::pair(user, new AudioReceiver(user)));
+	    userNames.insert(std::pair(user, userName));
+        usersReceivers.insert(std::pair(user, new AudioReceiver(user)));
 	    return true;
     }
     bool removeUser(const dpp::snowflake& user) {
-        std::cout << "Remove User: Accessing lock\n";
+        //std::cout << "Remove User: Accessing lock\n";
         std::lock_guard<std::mutex> lock(accessLock);
-        std::cout << "Remove User: Lock Accessed\n";
+        //std::cout << "Remove User: Lock Accessed\n";
+
+        auto userNameMap = userNames.find(user);
+        if (userNameMap != userNames.end())
+            userNames.erase(userNameMap);
+
         auto receiverMap = usersReceivers.find(user);
 	    if (receiverMap == usersReceivers.end())
 		    return false;
 		delete receiverMap->second;
-		usersReceivers.erase(receiverMap);
+        usersReceivers.erase(receiverMap);
 		return true;
 	}
 
@@ -70,15 +79,21 @@ public:
     
 private:
     dpp::snowflake guildId;
+    std::unordered_map<dpp::snowflake, std::string> userNames;
     std::unordered_map<dpp::snowflake, AudioReceiver*> usersReceivers;
     SpeechToText speechToText;
 	ServiceHandler serviceHandler;
-	dpp::voiceconn* connection;
+	dpp::discord_client* connection;
 
-    std::unordered_map<dpp::snowflake, std::vector<std::string>> userSTT;
+    //std::unordered_map<dpp::snowflake, std::vector<std::string>> userSTT;
     std::mutex accessLock;
     std::atomic<bool> running;
     std::thread workerThread;
+
+    std::thread voiceThread;
+    std::atomic<bool> isVoiceThreadRunning{false};
+
+    std::string userPrompt;
 
     void timeoutLoop() {
         std::cout << "Guild thread started for " << guildId << std::endl;
@@ -90,23 +105,127 @@ private:
     }
 
     void updateTimeout() {
-        std::lock_guard<std::mutex> lock(accessLock);
-	    for (auto user = usersReceivers.begin(); user != usersReceivers.end(); user++) {
-			std::vector<int16_t> buffer;
-            if (user->second->checkTimeout(buffer) && !buffer.empty()) {
-				auto userSnowflake = user->first;
-				processNewSpeechToText(&buffer, user->first);
-			}
-		}
+        {
+            std::lock_guard<std::mutex> lock(accessLock);
+	        for (auto user = usersReceivers.begin(); user != usersReceivers.end(); user++) {
+			    std::vector<int16_t> buffer;
+                if (user->second->checkTimeout(buffer) && !buffer.empty()) {
+				    auto userSnowflake = user->first;
+				    processNewSpeechToText(&buffer, user->first);
+			    }
+		    }
+        }
+        if (userPrompt.size() < BUFFER_SIZE_TRIGGER) return;
+        
+        bool expected = false;
+        if (!isVoiceThreadRunning.compare_exchange_strong(expected, true))
+            return;
+        voiceThread = std::thread([this] {
+            this->checkSTTBuffer();
+            isVoiceThreadRunning.store(false);
+        });
+        voiceThread.detach();
     }
 
     void processNewSpeechToText(std::vector<int16_t>* buffer, const dpp::snowflake& user) {
         std::string stt = speechToText.getResponse(buffer, user);
+        if (stt.empty()) return;
 	    std::cout << stt << std::endl;
-        
-        auto& list = userSTT[user];
-        if (list.empty()) list.reserve(20);
-        list.emplace_back(stt);
+
+        std::string name = "";
+        auto userName = userNames.find(user);
+        if (userName != userNames.end()) name = userName->second;
+        std::string newPrompt;
+        newPrompt.reserve(100);
+        newPrompt.append(name).append(": ").append(stt).append("\n");
+        userPrompt.append(std::move(newPrompt));
+
         std::cout << "Added new object to list.\n";
+    }
+
+    std::vector<uint8_t> upsampleAndConvert(const std::vector<int16_t>& input) {
+        // Prepare the output buffer: 2x for upsampling (24kHz → 48kHz), 2x for stereo, 2 bytes per sample
+        std::vector<uint8_t> output;
+        output.reserve(input.size() * 4 * sizeof(int16_t)); // 4x expansion (mono→stereo + upsample)
+
+        const float volume_scale = 0.8f; // Scale volume to prevent clipping/distortion
+
+        for (size_t i = 0; i < input.size() - 1; ++i) {
+            int16_t a = static_cast<int16_t>(input[i] * volume_scale);
+            int16_t b = static_cast<int16_t>(input[i + 1] * volume_scale);
+
+            // Original sample
+            int16_t s1 = a;
+            // Interpolated sample (basic linear interpolation)
+            int16_t s2 = static_cast<int16_t>((a + b) / 2);
+
+            // Stereo frame 1: s1 to Left and Right
+            output.push_back(s1 & 0xFF);             // LSB
+            output.push_back((s1 >> 8) & 0xFF);      // MSB
+            output.push_back(s1 & 0xFF);
+            output.push_back((s1 >> 8) & 0xFF);
+
+            // Stereo frame 2: s2 to Left and Right
+            output.push_back(s2 & 0xFF);
+            output.push_back((s2 >> 8) & 0xFF);
+            output.push_back(s2 & 0xFF);
+            output.push_back((s2 >> 8) & 0xFF);
+        }
+
+        // Handle final sample
+        int16_t last = static_cast<int16_t>(input.back() * volume_scale);
+        output.push_back(last & 0xFF);
+        output.push_back((last >> 8) & 0xFF);
+        output.push_back(last & 0xFF);
+        output.push_back((last >> 8) & 0xFF);
+
+        return output;
+    }
+    void checkSTTBuffer() {
+        std::cout << "- NEW PROMPT WILL BE SENT -\n";
+        std::cout << userPrompt << '\n';
+
+        std::string result = serviceHandler.openAiResponse(userPrompt, "You're name is paul. You are in a discord call with your friends. You work at MCDonalds as a cashier. Respond as if you are a single character in a group do not use any name definitions.");
+        std::cout << "- RESULT -\n";
+        std::cout << result << '\n';
+
+        std::vector<int16_t> audioResult = serviceHandler.elevenLabsTextToSpeech(result);
+        savePCMToFile(audioResult, "TMP.pcm");
+        auto test = upsampleAndConvert(audioResult);
+        streamPCMToVoiceChannel(test);
+        userPrompt.clear();
+    }
+
+    void streamPCMToVoiceChannel(std::vector<uint8_t>& pcm_data) {
+        if (!connection) {
+            std::cout << "Bot cluster not initialized.\n";
+            return;
+        }
+
+        dpp::voiceconn* conn = connection->get_voice(guildId);
+        if (!conn || !conn->voiceclient) {
+            std::cout << "Invalid voice connection.\n";
+            return;
+        }
+
+        int remainder = pcm_data.size() % 4;
+        if (remainder != 0) {
+            std::cout << "Trimming PCM buffer for alignment.\n";
+            for (int i = 0; i < remainder; i++) pcm_data.pop_back();
+        }
+
+        conn->voiceclient->send_audio_raw(reinterpret_cast<uint16_t*>(pcm_data.data()), pcm_data.size());
+    }
+
+    void savePCMToFile(const std::vector<int16_t>& audioData, const std::string& filename) {
+        std::ofstream outFile(filename, std::ios::binary);
+        if (!outFile) {
+            std::cerr << "Failed to open file for writing: " << filename << std::endl;
+            return;
+        }
+
+        outFile.write(reinterpret_cast<const char*>(audioData.data()), audioData.size() * sizeof(int16_t));
+        outFile.close();
+        std::cout << "Saved " << audioData.size() << " samples to " << filename << std::endl;
     }
 };

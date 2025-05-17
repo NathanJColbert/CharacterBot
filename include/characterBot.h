@@ -4,17 +4,19 @@
 
 class CharacterBot : public dpp::cluster {
 public:
-	CharacterBot(const char* token, const char* openAI, const char* leopard) :
-		OPEN_AI(openAI), LEOPARD(leopard), dpp::cluster(token) { }
+	CharacterBot(const char* token, const char* openAI, const char* leopard, const char* elevenLabs) :
+		OPEN_AI(openAI), LEOPARD(leopard), ELEVEN_LABS(elevenLabs), dpp::cluster(token) { }
 
 	void run();
 
 private:
     const char* OPEN_AI;
     const char* LEOPARD;
+    const char* ELEVEN_LABS;
 	std::unordered_map<dpp::snowflake, std::shared_ptr<GuildInformation>> guilds;
 
 	void joinVoice(const dpp::slashcommand_t& event);
+	void leaveVoice(const dpp::slashcommand_t& event);
 	bool stringExists(const std::string& origin, const std::string& check);
 	bool tryResponse(const std::string& stt);
 	void processNewSpeechToText(std::vector<int16_t>* buffer, GuildInformation* guildObject, const dpp::snowflake& guild, const dpp::snowflake& user);

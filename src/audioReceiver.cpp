@@ -19,9 +19,9 @@ bool AudioReceiver::checkTimeout(std::vector<int16_t>& buffer) {
 	auto now = std::chrono::steady_clock::now();
 	auto duration_since_last_receive = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastReceived).count();
 
-	std::cout << duration_since_last_receive << " : " << TIMEOUT_MILLISECONDS << std::endl;
+	//std::cout << duration_since_last_receive << " : " << TIMEOUT_MILLISECONDS << std::endl;
 	if (duration_since_last_receive > TIMEOUT_MILLISECONDS) {
-		std::cout << pcm_buffer.size() << " : " << MIN_BUFFER_SIZE << std::endl;
+		//std::cout << pcm_buffer.size() << " : " << MIN_BUFFER_SIZE << std::endl;
 		if (pcm_buffer.size() > MIN_BUFFER_SIZE) {
 			buffer = std::vector<int16_t>(pcm_buffer);
 			//save_audio_to_file("audio");

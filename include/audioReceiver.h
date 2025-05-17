@@ -2,9 +2,9 @@
 #include <dpp/dpp.h>
 #include <iostream>
 
-const size_t MIN_BUFFER_SIZE = 10000;
+const size_t MIN_BUFFER_SIZE = 30000;
 const size_t MAX_BUFFER_SIZE = 3200000;
-const long long TIMEOUT_MILLISECONDS = 600;
+const long long TIMEOUT_MILLISECONDS = 700;
 
 class AudioReceiver {
 public:

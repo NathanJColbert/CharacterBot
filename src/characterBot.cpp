@@ -8,7 +8,7 @@ void CharacterBot::run() {
 			joinVoice(event);
 		}
 		if (event.command.get_command_name() == "test") {
-            
+            leaveVoice(event);
 		}
 		});
 
@@ -91,7 +91,11 @@ bool CharacterBot::addUserInVoice(const dpp::snowflake& guild, const dpp::snowfl
 		std::cout << "Having issues finding a guild for the client." << std::endl;
 		return false;
 	}
-	if (!guildObj->addUser(user)) {
+
+	std::string userName = "";
+	auto userObj = dpp::find_user(user);
+	if (userObj != NULL) userName = userObj->username;
+	if (!guildObj->addUser(user, userName)) {
 		std::cout << "The user is already in the snowflake map! Skipping..." << std::endl;
 		return false;
 	}
@@ -157,8 +161,8 @@ void CharacterBot::joinVoice(const dpp::slashcommand_t& event) {
 	event.reply("Joined your channel!");
 
 	dpp::snowflake guildId = event.command.guild_id;
-	dpp::voiceconn* connection = event.from()->get_voice(guildId);
-	auto newGuild = std::make_shared<GuildInformation>(guildId, connection, OPEN_AI, LEOPARD);
+	dpp::discord_client* connection = event.from();
+	auto newGuild = std::make_shared<GuildInformation>(guildId, connection, OPEN_AI, LEOPARD, ELEVEN_LABS);
 	guilds.insert(std::pair(guildId, newGuild));
 
 	// Update all users already in the channel
@@ -169,6 +173,16 @@ void CharacterBot::joinVoice(const dpp::slashcommand_t& event) {
 			addUserInVoice(event.command.guild_id, voice_state_entry.first);
 		}
 	}
+}
+
+void CharacterBot::leaveVoice(const dpp::slashcommand_t& event) {
+	dpp::guild* guild = dpp::find_guild(event.command.guild_id);
+    if (!guild) {
+        event.reply("Guild not found!");
+        return;
+    }
+	event.from()->disconnect_voice(guild->id);
+	removeBotInGuildVoice(guild->id);
 }
 
 std::vector<uint16_t> CharacterBot::resampleTo48kHz(const std::vector<uint16_t>& raw_pcm_data_16k) {

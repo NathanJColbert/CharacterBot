@@ -2,7 +2,7 @@
 
 ## Description
 
-Making a reactive AI ChatBot in voice calls on discord. The build environment is MSYS2 MINGW64. I build using cmake.
+Making a reactive AI ChatBot in voice calls on discord. The build environment is MSYS2 MINGW64. Built using cmake.
 
 ## Table of Contents
 
@@ -17,7 +17,7 @@ Running on Windows 10, using MSYS2 MINGW64.
 
 ## Dependencies
 
-DPP can be covered by opus, fmt and gcc. You need git (obviously). ffmpeg is a residual library from older versions of this project. I intend to use it eventaully for the audio streaming.
+DPP can be covered by opus, fmt and gcc. You need git (obviously). ffmpeg is a residual library from older versions of this project. I intend to use it eventually for audio streaming.
 
 ```bash
 pacman -Syu
@@ -30,7 +30,7 @@ pacman -S \
     git
 ```
 
-DPP is used for the discord bot api. I had to modify some of the src files in the source dpp repository to run on windows using cmake (In the MINGW64 env). So, this project uses a submodule copied from the main DPP branch
+DPP is used for the discord bot api. I had to modify some of the src files in the source dpp repository to run on windows using cmake (In the MINGW64 env). So, this project uses a submodule copied from the main DPP branch.
 
 ## Installation & Setup
 
