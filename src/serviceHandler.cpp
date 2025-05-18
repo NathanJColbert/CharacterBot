@@ -106,7 +106,7 @@ void ServiceHandler::truncateTokenHistory(std::deque<std::pair<std::string, std:
 }
 
 std::vector<int16_t> ServiceHandler::elevenLabsTextToSpeech(const std::string& text) {
-	// outputs signed little endian 16000 Hz
+	// outputs signed little endian 24000 Hz
 	CURL* curl;
 	CURLcode res;
 	std::vector<char> response_data;

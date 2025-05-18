@@ -5,11 +5,11 @@
 struct AudioReceiverSettings {
 	AudioReceiverSettings() = default;
 	AudioReceiverSettings(size_t minBuffer, size_t maxBuffer, long long timeout) :
-	minBufferSize(minBuffer), maxBufferSize(maxBuffer), timoutMilliseconds(timeout)
+	minBufferSize(minBuffer), maxBufferSize(maxBuffer), timeoutMilliseconds(timeout)
 	{ }
 	size_t minBufferSize;
 	size_t maxBufferSize;
-	long long timoutMilliseconds;
+	long long timeoutMilliseconds;
 };
 
 class AudioReceiver {
@@ -21,7 +21,7 @@ public:
 		pcm_buffer.reserve(settings->maxBufferSize);
 	}
 	~AudioReceiver() {
-		std::cout << "Destroyed Reciever" << std::endl;
+		std::cout << "Destroyed Receiver" << std::endl;
 	}
 
 	void onVoiceReceive(const dpp::voice_receive_t& data);

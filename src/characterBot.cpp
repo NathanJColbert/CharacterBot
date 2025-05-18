@@ -24,12 +24,12 @@ void CharacterBot::run() {
         		std::cout << "All global commands deleted successfully." << std::endl;
     		}
 		});
-		}
+		
 		if (dpp::run_once<struct register_bot_commands>()) {
 			global_command_create(dpp::slashcommand("join", "Joins the active channel", me.id));
 			global_command_create(dpp::slashcommand("leave", "Leaves the active channel", me.id));
 		}
-		});
+		}});
 
 
 	on_voice_receive([this](const dpp::voice_receive_t& data) {
@@ -47,13 +47,24 @@ void CharacterBot::run() {
 
 	start(dpp::st_return);
 	std::cout << "Bot started successfully!" << std::endl;
-	std::thread input_thread([]() {
+	std::thread input_thread([this]() {
 		std::string input;
 		while (bot_running) {
 			std::getline(std::cin, input);
 			if (menuCompareInput(input, {"quit", "q", "exit", "e"})) {
 				std::cout << "Shutting down bot..." << std::endl;
 				bot_running = false;
+			}
+			else if (menuCompareInput(input, {"count", "c", "servercount"})) {
+				if (guilds.size() <= 0) {
+					std::cout << "Zero active guilds." << std::endl;
+				}
+				else {
+					std::cout << "Total guilds: " << guilds.size() << std::endl;
+					for (auto i = guilds.begin(); i != guilds.end(); i++) {
+						std::cout << "\tGuildId: [" << i->first << "] active users in voice: " << i->second->userCount() << std::endl;
+					}
+				}
 			}
 		}
 	});
@@ -91,8 +102,14 @@ bool CharacterBot::addUserInVoice(const dpp::snowflake& guild, const dpp::snowfl
 	}
 
 	std::string userName = "";
-	auto userObj = dpp::find_user(user);
-	if (userObj != NULL) userName = userObj->username;
+	dpp::guild_member member = dpp::find_guild_member(guild, user);
+	if (!member.get_nickname().empty()) {
+		userName = member.get_nickname();
+	} else {
+		auto userObj = dpp::find_user(user);
+		if (userObj) userName = userObj->username;
+	}
+
 	if (!guildObj->addUser(user, userName)) {
 		std::cout << "The user is already in the snowflake map! Skipping..." << std::endl;
 		return false;

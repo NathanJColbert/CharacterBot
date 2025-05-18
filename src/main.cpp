@@ -5,14 +5,18 @@
 #include "ServiceHandler.h"
 
 const char* CHARACTER_PROMPT = "Your name is Palamedes. You are a great and powerful fantasy knight. You are in a discord call with your friends. Respond as if you are an individual in a group. Do not speak in the third person. Keep your response short";
+//const char* CHARACTER_PROMPT = "Your name is Potion seller. You are a grummpy old man who refuses to sell potions to anyone. This is because you believe your potions are too strong for anyone. Respond as if you are an individual in a group. Do not speak in the third person. Keep your response short";
 const char* ELEVEN_LABS_SPEECH_ID = "N2lVS1w4EtoT3dr4eOWO";
+//const char* ELEVEN_LABS_SPEECH_ID = "zQtrcVyDViAdtX0qcTTG";
 
 const long long CHECK_TIME_MILLISECONDS = 200;
 
-const long long MIN_TIME_BETWEEN_RESPONSES_MILLISECONDS = 8000;
-const size_t BUFFER_SIZE_TRIGGER = 70;
+const long long MIN_TIME_BETWEEN_RESPONSES_MILLISECONDS = 10000;
+const size_t BUFFER_SIZE_TRIGGER = 50;
+const long long MIN_TIMEOUT_RESPONSE = 900;
+const long long EMPTY_SPACE_TIMEOUT = 10000;
 
-const size_t MIN_BUFFER_SIZE = 10000;
+const size_t MIN_BUFFER_SIZE = 8000;
 const size_t MAX_BUFFER_SIZE = 3200000;
 const long long TIMEOUT_MILLISECONDS = 700;
 
@@ -44,7 +48,7 @@ int main() {
     // Kinda a large setup for settings but its more neat this way...
     // However, only one object needed!
     ServiceInformation serviceSettings(openAIToken, leopardToken, elevenLabsToken, ELEVEN_LABS_SPEECH_ID);
-    CharacterSettings characterSettings(CHARACTER_PROMPT, MIN_TIME_BETWEEN_RESPONSES_MILLISECONDS, BUFFER_SIZE_TRIGGER);
+    CharacterSettings characterSettings(CHARACTER_PROMPT, MIN_TIME_BETWEEN_RESPONSES_MILLISECONDS, BUFFER_SIZE_TRIGGER, MIN_TIMEOUT_RESPONSE, EMPTY_SPACE_TIMEOUT);
     AudioReceiverSettings audioReceiverSettings(MIN_BUFFER_SIZE, MAX_BUFFER_SIZE, TIMEOUT_MILLISECONDS);
     BotInformation settings(serviceSettings, characterSettings, audioReceiverSettings, CHECK_TIME_MILLISECONDS);
 

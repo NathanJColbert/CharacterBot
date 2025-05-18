@@ -11,12 +11,14 @@
 #include "serviceHandler.h"
 
 struct CharacterSettings {
-    CharacterSettings(const char* characterP, long long minResponse, size_t minBuffer) :
-    characterPrompt(characterP), minResponseTime(minResponse), minBufferSize(minBuffer)
+    CharacterSettings(const char* characterP, long long minResponse, size_t minBuffer, long long minSpokenTimeout, long long emptyTimeout) :
+    characterPrompt(characterP), minResponseTime(minResponse), minBufferSize(minBuffer), minSpokenTimeout(minSpokenTimeout), emptySpaceTimeout(emptyTimeout)
     { }
     std::string characterPrompt;
 	long long minResponseTime;
 	size_t minBufferSize;
+    long long minSpokenTimeout;
+    long long emptySpaceTimeout;
 };
 
 struct ServiceInformation {
@@ -71,6 +73,11 @@ public:
     }
 
     bool sendVoiceData(const dpp::voice_receive_t& data) {
+        {
+            std::lock_guard<std::mutex> lock(lastUserSpokenTimeLock);
+            lastUserSpokenTime = std::chrono::steady_clock::now();
+        }
+
         AudioReceiver* receiver = NULL;
         {
             std::lock_guard<std::mutex> lock(accessLock);
@@ -135,6 +142,9 @@ private:
 
     std::chrono::steady_clock::time_point lastResponse;
     std::mutex lastResponseLock;
+    
+    std::chrono::steady_clock::time_point lastUserSpokenTime;
+    std::mutex lastUserSpokenTimeLock;
 
     void timeoutLoop() {
         std::cout << "Guild thread started for " << guildId << std::endl;
@@ -156,14 +166,30 @@ private:
 			    }
 		    }
         }
+        
+        auto now = std::chrono::steady_clock::now();
         std::chrono::steady_clock::time_point snapshot;
+        {
+            std::lock_guard<std::mutex> lock(lastUserSpokenTimeLock);
+            snapshot = lastUserSpokenTime;
+        }
+        auto lastSpokenDuration = std::chrono::duration_cast<std::chrono::milliseconds>(now - snapshot).count();
+
+        if (userPrompt.size() == 0) return;
+        if (lastSpokenDuration < botInformation->characterSettings.emptySpaceTimeout)
+            if (userPrompt.size() < botInformation->characterSettings.minBufferSize) 
+                return;
+        
+        if (lastSpokenDuration < botInformation->characterSettings.minSpokenTimeout) {
+            //std::cout << "Prevented premature response (talking over) at -> " << lastSpokenDuration << " milliseconds. Needed -> " << botInformation->characterSettings.minSpokenTimeout << " milliseconds.\n";
+            return;
+        }
+
         {
             std::lock_guard<std::mutex> lock(lastResponseLock);
             snapshot = lastResponse;
         }
-        auto now = std::chrono::steady_clock::now();
 	    auto lastResponseDuration = std::chrono::duration_cast<std::chrono::milliseconds>(now - snapshot).count();
-        if (userPrompt.size() < botInformation->characterSettings.minBufferSize) return;
         if (lastResponseDuration < botInformation->characterSettings.minResponseTime) {
             //std::cout << "Prevented premature response at -> " << lastResponseDuration << " milliseconds. Needed -> " << MIN_TIME_BETWEEN_RESPONSES_MILLISECONDS << " milliseconds.\n";
             return;
