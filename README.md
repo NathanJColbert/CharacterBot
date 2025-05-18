@@ -10,6 +10,7 @@ Making a reactive AI ChatBot in voice calls on discord. The build environment is
 - [Dependencies](#dependencies)
 - [Installation & Setup](#installation--setup)
 - [Usage](#usage)
+- [Known Issues](#known-issues)
 
 ## Source Architecture
 
@@ -74,3 +75,7 @@ Argument variables can change the character prompt and voice,
 # The speech ID is a default voice on ElevenLabs.
 ./AiBot.exe -prompt "You are a middle aged man who really likes dad jokes." -speech "N2lVS1w4EtoT3dr4eOWO"
 ```
+
+## Known Issues
+
+- [DPP THREAD COMPLEXITY] Currently the bot can only handle sending audio to one guild at a time. This is VERY BAD because I set up the bot to handle multiple guilds on separate threads. Currently if the bot tries to buffer audio to multiple guilds it will hard crash! I am looking into what I can do. I may be using DPP's library wrong...
