@@ -2,13 +2,14 @@
 
 ## Description
 
-Making a reactive AI ChatBot in voice calls on discord. The build environment is MSYS2 MINGW64. Built using cmake.
+Making a reactive AI ChatBot in voice calls on discord. The build environment is MSYS2 MINGW64. Built using cmake. Three major API(s). Leopard (Speech to Text), OpenAI (AI Response) and ElevenLabs (Text to Speech).
 
 ## Table of Contents
 
 - [Source Architecture](#source-architecture)
 - [Dependencies](#dependencies)
 - [Installation & Setup](#installation--setup)
+- [Usage](#usage)
 
 ## Source Architecture
 
@@ -48,5 +49,28 @@ mkdir build
 cd build
 cmake .. -G Ninja -DCMAKE_BUILD_TYPE=Release
 ninja
-./AIBot.exe
+```
+
+## Usage
+
+This project takes advantage of three major API(s). Leopard (Speech to Text), OpenAI (AI Response) and ElevenLabs (Text to Speech).
+
+After installation, setup your API keys as environmental variables.
+
+```bash
+export BOT_TOKEN="TOKEN"
+export OPEN_AI_TOKEN="TOKEN"
+export LEOPARD_TOKEN="TOKEN"
+export ELEVEN_LABS_TOKEN="TOKEN"
+```
+
+Then you can run. 
+```bash
+./AiBot.exe
+```
+
+Argument variables can change the character prompt and voice,
+```bash
+# The speech ID is a default voice on ElevenLabs.
+./AiBot.exe -prompt "You are a middle aged man who really likes dad jokes." -speech "N2lVS1w4EtoT3dr4eOWO"
 ```

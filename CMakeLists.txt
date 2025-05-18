@@ -21,6 +21,8 @@ add_executable(AIBot
     src/characterBot.cpp
     src/audioReceiver.cpp
     src/speechToText.cpp
+    src/guildInformation.cpp
+    src/argControl.cpp
 )
 
 target_include_directories(AIBot PRIVATE 

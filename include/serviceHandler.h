@@ -35,5 +35,5 @@ private:
 	std::deque<std::pair<std::string, std::string>> conversation_history;
 
 	size_t estimateTokens(const std::string& text) { return text.size() / 4; }
-	void truncateTokenHistory(std::deque<std::pair<std::string, std::string>>& history);
+	void truncateTokenHistory(std::deque<std::pair<std::string, std::string>>& history, const std::string& systemPrompt);
 };

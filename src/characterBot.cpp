@@ -82,7 +82,7 @@ void CharacterBot::run() {
 void CharacterBot::disconnectAll() {
 	for (auto i = guilds.begin(); i != guilds.end(); i++) {
 		auto conn = i->second->getConnection();
-		if (conn) conn->disconnect_voice(i->first);
+		if (conn) conn->disconnect();
 	}
 }
 
@@ -176,7 +176,8 @@ void CharacterBot::joinVoice(const dpp::slashcommand_t& event) {
 	event.reply("Joined your channel!");
 
 	dpp::snowflake guildId = event.command.guild_id;
-	dpp::discord_client* connection = event.from();
+	dpp::discord_client* conn = event.from();
+	dpp::voiceconn* connection = conn->get_voice(guildId);
 	auto newGuild = std::make_shared<GuildInformation>(guildId, connection, botInformation);
 	guilds.insert(std::pair(guildId, newGuild));
 

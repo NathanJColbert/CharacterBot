@@ -3,12 +3,13 @@
 std::string ServiceHandler::openAiResponse(const std::string& prompt, const std::string& systemPrompt) {
     std::string url = "https://api.openai.com/v1/chat/completions";
 
-	conversation_history.push_back({ "user",prompt });
-	truncateTokenHistory(conversation_history);
+	conversation_history.push_back({ "user", prompt });
+	truncateTokenHistory(conversation_history, systemPrompt);
 
 	dpp::json prompt_json;
-	prompt_json["model"] = "gpt-4";
+	prompt_json["model"] = "gpt-3.5-turbo";
 	prompt_json["max_tokens"] = 150;
+	prompt_json["temperature"] = 0.8;
 
 	dpp::json messages = dpp::json::array();
 	messages.push_back({ {"role", "system"}, {"content", systemPrompt} });
@@ -89,20 +90,29 @@ std::string ServiceHandler::openAiResponse(const std::string& prompt, const std:
     return result;
 }
 
-void ServiceHandler::truncateTokenHistory(std::deque<std::pair<std::string, std::string>>& history) {
-	size_t total_tokens = 0;
-	for (const auto& message : history) {
-		total_tokens += estimateTokens(message.second);
-	}
+void ServiceHandler::truncateTokenHistory(std::deque<std::pair<std::string, std::string>>& history, const std::string& systemPrompt) {
+	const size_t MAX_TOTAL = 4096;
+    const size_t MAX_OUTPUT = 150;
+    const size_t MAX_PROMPT = MAX_TOTAL - MAX_OUTPUT;
 
-	const size_t MAX_TOKENS = 2000;
-	while (total_tokens > MAX_TOKENS) {
-		history.pop_front();  // Remove the oldest message
-		total_tokens = 0;
-		for (const auto& message : history) {
-			total_tokens += estimateTokens(message.second);
-		}
+    std::deque<size_t> token_counts;
+    size_t total_tokens = estimateTokens(systemPrompt);
+	if (total_tokens > MAX_PROMPT) {
+    	history.clear();
+    	return;
 	}
+    for (const auto& message : history) {
+        size_t tokens = estimateTokens(message.second);
+        token_counts.push_back(tokens);
+        total_tokens += tokens;
+    }
+
+    // Trim history from the front until total is within budget
+    while (total_tokens > MAX_PROMPT && !history.empty()) {
+        total_tokens -= token_counts.front();
+        token_counts.pop_front();
+        history.pop_front();
+    }
 }
 
 std::vector<int16_t> ServiceHandler::elevenLabsTextToSpeech(const std::string& text) {

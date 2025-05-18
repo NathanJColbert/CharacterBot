@@ -6,11 +6,18 @@
 #include "guildInformation.h"
 #include "menuControl.h"
 
+/*
+Character bot object. Wraps a single cluster object as the main character bot
+*/
 class CharacterBot : public dpp::cluster {
 public:
 	CharacterBot(const char* token, BotInformation* information) :
 		botInformation(information), dpp::cluster(token) { }
 
+	/*
+	Runs the bot. Manages the threads on its own. This does not return
+	until shut down by use of commands.
+	*/
 	void run();
 
 private:
