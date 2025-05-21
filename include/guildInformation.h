@@ -32,6 +32,14 @@ struct ServiceInformation {
 	std::string elevenLabsSpeechId;
 };
 
+/*
+Settings for the bot. I actually kinda hate this...
+
+serviceInformation      (openAI, leopard, elevenLab, elevenLabId)
+characterSettings       (characterP, minResponse, minBuffer, minSpokenTimeout, emptyTimeout)
+audioReceiverSettings   (minBuffer, maxBuffer, timeout)
+checkTimeMilliseconds
+*/
 struct BotInformation {
 	BotInformation() = default;
 	BotInformation(const ServiceInformation& serviceInfo, const CharacterSettings& characterSet, const AudioReceiverSettings& audioReceiver, long long checkTime) :
@@ -43,11 +51,11 @@ struct BotInformation {
     long long checkTimeMilliseconds;
 };
 
-/*
-A single guild object for voice connection.
-Each guild can have exactly one connected voice.
-This should be thread safe...
-*/
+// -----------------------------------------------------------------------------
+// A single guild object for voice connection.
+// Each guild can have exactly one connected voice.
+// This should be thread safe...
+// -----------------------------------------------------------------------------
 class GuildInformation {
 public:
 	GuildInformation(const dpp::snowflake& guild, dpp::voiceconn* conn, BotInformation* information) :
@@ -65,10 +73,10 @@ public:
 	
     ~GuildInformation() { stop(); }
 
-    /*
-    Stops the current threads in the object.
-    This is called from the deconstructor.
-    */
+    // -----------------------------------------------------------------------------
+    // Stops the current threads in the object.
+    // This is called from the deconstructor.
+    // -----------------------------------------------------------------------------
     void stop() {
         running = false;
         if (workerThread.joinable())
@@ -77,22 +85,25 @@ public:
             voiceThread.join();
     }
 
-    /*
-    Sends the dpp voice data to the guild object.
-    */
+    // -----------------------------------------------------------------------------
+    // Sends the dpp voice data to the guild object.
+    // -----------------------------------------------------------------------------
     bool sendVoiceData(const dpp::voice_receive_t& data);
 
-    /*
-    Adds a new user to the guild object in the call
-    */
+    // -----------------------------------------------------------------------------
+    // Adds a new user to the guild object in the call
+    // -----------------------------------------------------------------------------
     bool addUser(const dpp::snowflake& user, const std::string& userName);
-    /*
-    Removes a user from the guild object in the call
-    */
+    
+    // -----------------------------------------------------------------------------
+    // Removes a user from the guild object in the call
+    // -----------------------------------------------------------------------------
     bool removeUser(const dpp::snowflake& user);
 
     size_t userCount() const { return usersReceivers.size(); }
     dpp::voiceconn* getConnection() { return connection; }
+    std::chrono::steady_clock::time_point lastResponseTime() const { return lastResponse; }
+
 
 private:
     BotInformation* botInformation;

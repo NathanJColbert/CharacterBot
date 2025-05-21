@@ -6,6 +6,8 @@ std::atomic<bool> bot_running{true};
 void CharacterBot::run() {
 	//on_log(dpp::utility::cout_logger());
 
+	intents = dpp::i_default_intents | dpp::i_message_content;
+
 	on_slashcommand([this](const dpp::slashcommand_t& event) {
 		if (event.command.get_command_name() == "join") {
 			joinVoice(event);
@@ -23,26 +25,36 @@ void CharacterBot::run() {
     		} else {
         		std::cout << "All global commands deleted successfully." << std::endl;
     		}
-		});
+			});
+		}
 		
 		if (dpp::run_once<struct register_bot_commands>()) {
 			global_command_create(dpp::slashcommand("join", "Joins the active channel", me.id));
 			global_command_create(dpp::slashcommand("leave", "Leaves the active channel", me.id));
 		}
-		}});
+		});
 
 
 	on_voice_receive([this](const dpp::voice_receive_t& data) {
+		if (lockVoiceInput) return;
 		// Check sum?
 		if (data.audio_data.size() == 3840) {
 			std::shared_ptr<GuildInformation> guildObj = NULL;
-			if (tryGetGuildInformation(guildObj, data.voice_client->server_id))
+			if (tryGetGuildInformation(guildObj, data.voice_client->server_id)) {
+				auto now = std::chrono::steady_clock::now();
+				auto currentDuration = std::chrono::duration_cast<std::chrono::milliseconds>(now - guildObj->lastResponseTime()).count();
+				if (currentDuration < IGNORE_VOICE_TIME_MILLISECONDS) return;
 				guildObj->sendVoiceData(data);
+			}
 		}
 		});
 
 	on_voice_state_update([this](const dpp::voice_state_update_t& event) {
 		handleVoiceStateUpdate(event);
+		});
+
+	on_message_create([this](const dpp::message_create_t& event) {
+		handleIncomingMessage(event);
 		});
 
 	start(dpp::st_return);
@@ -66,6 +78,14 @@ void CharacterBot::run() {
 					}
 				}
 			}
+			else if (menuCompareInput(input, {"stop", "s", "stopinput"})) {
+				lockVoiceInput.store(true);
+				std::cout << "Stopped voice input." << std::endl;
+			}
+			else if (menuCompareInput(input, {"resume", "r", "resumeinput"})) {
+				lockVoiceInput.store(false);
+				std::cout << "Resumed voice input." << std::endl;
+			}
 		}
 	});
 
@@ -73,17 +93,43 @@ void CharacterBot::run() {
 		std::this_thread::sleep_for(std::chrono::milliseconds(500));
 	}
 
-	disconnectAll();
+	auto connections = disconnectAll();
+	int count = 0;
+	while (testConnectionsActive(connections, count)) {
+		std::cout << "[" << connections.size() << "] Waiting for connections to close." << std::endl;
+		std::this_thread::sleep_for(std::chrono::milliseconds(200));
+	}
+
 	if (input_thread.joinable()) {
 		input_thread.join();
 	}
 }
 
-void CharacterBot::disconnectAll() {
+bool CharacterBot::testConnectionsActive(const std::vector<dpp::voiceconn*>& connections, int& total) {
+	total = 0;
+	bool result = false;
+	for (size_t i = 0; i < connections.size(); i ++) {
+		if (connections[i] && connections[i]->is_active()) {
+			result = true;
+			total++;
+		}
+	}
+	return result;
+}
+
+std::vector<dpp::voiceconn*> CharacterBot::disconnectAll() {
+	std::vector<dpp::voiceconn*> output;
+	output.reserve(guilds.size());
 	for (auto i = guilds.begin(); i != guilds.end(); i++) {
 		auto conn = i->second->getConnection();
-		if (conn) conn->disconnect();
+		if (!conn) {
+			std::cout << "Voice connection is null." << std::endl;
+			continue;
+		}
+		conn->disconnect();
+		output.emplace_back(conn);
 	}
+	return output;
 }
 
 bool CharacterBot::tryGetGuildInformation(std::shared_ptr<GuildInformation>& guildInformation, const dpp::snowflake& guild) {
@@ -103,6 +149,7 @@ bool CharacterBot::addUserInVoice(const dpp::snowflake& guild, const dpp::snowfl
 
 	std::string userName = "";
 	dpp::guild_member member = dpp::find_guild_member(guild, user);
+	if (member.get_user()->is_bot()) return false;
 	if (!member.get_nickname().empty()) {
 		userName = member.get_nickname();
 	} else {
@@ -206,4 +253,24 @@ bool CharacterBot::activeInGuild(const dpp::snowflake& guild) {
 	auto guildIterator = guilds.find(guild);
 	if (guildIterator != guilds.end()) return true;
 	return false;
+}
+
+std::shared_ptr<MessageContextResponse> CharacterBot::getMessageContext(const dpp::snowflake guildId) {
+	auto i = messageContextGuilds.find(guildId);
+	if (i == messageContextGuilds.end()) {
+		auto newContext = std::make_shared<MessageContextResponse>(messageContextSettings);
+		messageContextGuilds.insert(std::pair(guildId, newContext));
+		std::cout << "Created new message context for guild: " << guildId << std::endl;
+		return newContext;
+	}
+	return i->second;
+}
+
+void CharacterBot::handleIncomingMessage(const dpp::message_create_t& event) {
+	if (event.msg.author.is_bot()) return;
+	//std::cout << "Message [" << event.msg.author.username << "]: " << event.msg.content << std::endl;
+	dpp::message response;
+	if (getMessageContext(event.msg.guild_id)->tryGetResponse(event, response)) {
+		this->message_create(response);
+	}
 }

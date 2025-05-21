@@ -179,7 +179,11 @@ void GuildInformation::sendPrompt() {
     //savePCMToFile(audioResult, "TMP.pcm");
     auto test = upsampleAndConvert(audioResult);
     streamPCMToVoiceChannel(test);
-    userPrompt.clear();
+    
+    {
+        std::lock_guard<std::mutex> lock(userPromptLock);
+        userPrompt.clear();
+    }
 }
 
 void GuildInformation::streamPCMToVoiceChannel(std::vector<uint8_t>& pcm_data) {
@@ -194,9 +198,24 @@ void GuildInformation::streamPCMToVoiceChannel(std::vector<uint8_t>& pcm_data) {
         for (int i = 0; i < remainder; i++) pcm_data.pop_back();
     }
 
-    std::lock_guard<std::mutex> lock(voiceSendMutex);
-    std::cout << "Sending audio raw..." << std::endl;
-    connection->voiceclient->send_audio_raw(reinterpret_cast<uint16_t*>(pcm_data.data()), pcm_data.size());
+    std::vector<uint16_t> pcm_aligned(pcm_data.size() / 2);
+    std::memcpy(pcm_aligned.data(), pcm_data.data(), pcm_data.size());
+
+    std::thread([this, pcm = std::move(pcm_aligned)]() {
+        auto vc = connection ? connection->voiceclient : nullptr;
+        if (!vc) {
+            std::cerr << "Voice client became invalid before send.\n";
+            return;
+        }
+
+        try {
+            auto temp = std::vector<uint16_t>(pcm);
+            std::cout << "Sending audio raw..." << std::endl;
+            vc->send_audio_raw(temp.data(), temp.size() * sizeof(uint16_t));
+        } catch (const std::exception& e) {
+            std::cerr << "Audio send failed: " << e.what() << std::endl;
+        }
+    }).detach();
 }
 
 void GuildInformation::savePCMToFile(const std::vector<int16_t>& audioData, const std::string& filename) {
